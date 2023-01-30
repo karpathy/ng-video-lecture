@@ -184,9 +184,9 @@ class BigramLanguageModel(nn.Module):
         return idx
 
 model = BigramLanguageModel()
-m = model.to(device)
+model.to(device)
 # print the number of parameters in the model
-print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
 
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
