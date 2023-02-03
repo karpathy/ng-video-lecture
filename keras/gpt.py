@@ -141,28 +141,51 @@ class TransformerLayer(layers.Layer):
         return logits
 
 
+def estimate_loss(model: keras.Model, num_iters: int, data: Data):
+
+    def _eval_split(split):
+        return np.mean([model.evaluate(*data.fetch_batch(split), verbose=0)
+                        for _ in range(num_iters)])
+
+    return {s: _eval_split(s)
+            for s in [Data.TRAIN_SPLIT, data.VAL_SPLIT]}
+
+
 keras.utils.set_random_seed(1116)
 
 # hyperparameters
 batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-max_iters = 5000
-eval_interval = 500
-eval_iters = 200
+# max_iters = 5000
+# eval_interval = 500
+# eval_iters = 200
+max_iters = 500
+eval_interval = 50
+eval_iters = 20
 learning_rate = 3e-4
 n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
-# ------------
 
-train_data = Data(block_size, batch_size, split='train', data_pts_per_epoch=max_iters)
-val_data = Data(block_size, batch_size, split='test', data_pts_per_epoch=eval_iters)
+data = Data(block_size, batch_size)
 
+# build model
 inputs = keras.Input((block_size,))
-outputs = TransformerLayer(train_data.vocab_size, n_embd, n_head, n_layer, dropout)(inputs)
+outputs = TransformerLayer(data.vocab_size, n_embd, n_head, n_layer, dropout)(inputs)
 m = keras.Model(inputs, outputs)
 m.compile(optimizer=keras.optimizers.Adam(learning_rate),
           loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
-m.fit(train_data, epochs=1, validation_freq=eval_interval)
-m.train_on_batch(train_data)
+
+# train
+for i in range(max_iters):
+
+    # every once in a while evaluate the loss on train and val sets
+    if i % eval_interval == 0 or i == max_iters - 1:
+        losses = estimate_loss(m, eval_iters, data)
+        print(f"step {i}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        pass
+
+    xb, yb = data.fetch_batch(Data.TRAIN_SPLIT)
+    loss = m.train_on_batch(xb, yb)
+    print(f'Batch {i}: loss {loss:.4f}')
