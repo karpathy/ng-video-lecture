@@ -1,13 +1,13 @@
 import numpy as np
 import tensorflow as tf
-keras = tf.keras        # silly imports to work around PyCharm inspections
-layers = keras.layers
-from transformer import Transformer, generate_tokens
 
-
-class ShakespeareData(tf.keras.utils.Sequence):
+class Data(tf.keras.utils.Sequence):
 
   def __init__(self, seq_len, batch_size, split: str, random_seed=0, data_pts_per_epoch=None):
+    """
+    The Data class that streams data batches for the Keras model
+    """
+
     np.random.seed(random_seed)
     assert split in {'train', 'test'}
     self.seq_len = seq_len    # e.g. 8
@@ -15,7 +15,7 @@ class ShakespeareData(tf.keras.utils.Sequence):
     self.split = split
 
     # read it in to inspect it
-    with open('./data/shakespeare.txt', 'r', encoding='utf-8') as f:
+    with open('../input.txt', 'r', encoding='utf-8') as f:
       text = f.read()
 
     # here are all the unique characters that occur in this text
@@ -56,13 +56,10 @@ class ShakespeareData(tf.keras.utils.Sequence):
     return self.batches_per_epoch
 
 if __name__ == '__main__':
-    data = ShakespeareData(seq_len=20, batch_size=32, split='train')
-    batches = [data.__getitem__(0) for _ in range(10)]
-
     seq_len = 12
     batch_size = 32
-    trainData = ShakespeareData(seq_len, batch_size, 'train', data_pts_per_epoch=5000)
-    testData = ShakespeareData(seq_len, batch_size, 'test', data_pts_per_epoch=2000)
+    trainData = Data(seq_len, batch_size, 'train', data_pts_per_epoch=5000)
+    testData = Data(seq_len, batch_size, 'test', data_pts_per_epoch=2000)
 
     inputs = keras.Input(shape=(seq_len,))
 
