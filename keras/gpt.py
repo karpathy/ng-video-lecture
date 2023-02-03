@@ -152,7 +152,9 @@ class TransformerModel:
         inputs = keras.Input((block_size,))
         outputs = TransformerLayer(vocab_size, n_embd, n_head, n_layer, dropout_rate)(inputs)
         self.model = keras.Model(inputs, outputs)
-        self.model.compile(optimizer=keras.optimizers.Adam(learning_rate),
+
+        # If AdamW does not work on Apple Silicon GPU, change to optimizer.Adam instead.
+        self.model.compile(optimizer=keras.optimizers.experimental.AdamW(learning_rate),
                            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
         self.model.summary()
 
@@ -215,3 +217,5 @@ for i in range(max_iters):
 
     xb, yb = data.fetch_batch(Data.TRAIN_SPLIT)
     loss = transformer.train_on_batch(xb, yb)
+
+open('./more.txt', 'w').write(data.decoder(transformer.generate_text(10000, data.decoder)))

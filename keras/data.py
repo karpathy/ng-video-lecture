@@ -35,7 +35,7 @@ class Data:
 
     n = int(.9 * len(data))
     self.data = {Data.TRAIN_SPLIT: np.array(data[:n]), Data.VAL_SPLIT: np.array(data[n:])}
-    print(f'Train size: {self.data[Data.TRAIN_SPLIT]}; validation size: {self.data[Data.VAL_SPLIT]}')
+    print(f'Train size: {len(self.data[Data.TRAIN_SPLIT])}; validation size: {len(self.data[Data.VAL_SPLIT])}')
 
 
   def fetch_batch(self, split):
