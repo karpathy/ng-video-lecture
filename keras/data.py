@@ -1,3 +1,7 @@
+"""
+The Data class that streams data batches for the Keras model
+"""
+
 import numpy as np
 
 
@@ -31,7 +35,7 @@ class Data:
 
     n = int(.9 * len(data))
     self.data = {Data.TRAIN_SPLIT: np.array(data[:n]), Data.VAL_SPLIT: np.array(data[n:])}
-    print("length of dataset in characters: ", len(self.data))
+    print(f'Train size: {self.data[Data.TRAIN_SPLIT]}; validation size: {self.data[Data.VAL_SPLIT]}')
 
 
   def fetch_batch(self, split):

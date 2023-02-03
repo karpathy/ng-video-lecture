@@ -5,9 +5,11 @@ Keras version of the Transformer
 import math
 import numpy as np
 import tensorflow as tf
-keras = tf.keras        # silly imports to work around PyCharm inspections
-layers = keras.layers
-from keras import backend as K
+from scipy.special import softmax
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras import backend as K
+from typing import Callable, List
 
 from data import Data
 
@@ -141,51 +143,75 @@ class TransformerLayer(layers.Layer):
         return logits
 
 
-def estimate_loss(model: keras.Model, num_iters: int, data: Data):
+class TransformerModel:
+    def __init__(self, vocab_size, n_embd, n_head, n_layer, block_size, dropout_rate, learning_rate, random_seed=1116):
+        self.block_size = block_size
+        self.vocab_size = vocab_size
 
-    def _eval_split(split):
-        return np.mean([model.evaluate(*data.fetch_batch(split), verbose=0)
-                        for _ in range(num_iters)])
+        keras.utils.set_random_seed(random_seed)
+        inputs = keras.Input((block_size,))
+        outputs = TransformerLayer(vocab_size, n_embd, n_head, n_layer, dropout_rate)(inputs)
+        self.model = keras.Model(inputs, outputs)
+        self.model.compile(optimizer=keras.optimizers.Adam(learning_rate),
+                           loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
+        self.model.summary()
 
-    return {s: _eval_split(s)
-            for s in [Data.TRAIN_SPLIT, data.VAL_SPLIT]}
+    def estimate_loss(self, num_iters: int, data: Data) -> dict:
+        res = dict()
+        for split in [data.TRAIN_SPLIT, data.VAL_SPLIT]:
+            loss = np.mean([self.model.evaluate(*data.fetch_batch(split), verbose=0)
+                           for _ in range(num_iters)])
+            res[split] = loss
+            print(f'{split} loss {loss:.4f}')
+
+        return res
+
+    def generate_text(self, max_new_tokens: int, decoder: Callable) -> List[int]:
+        res = []
+        idx = [0] * self.block_size
+
+        for _ in range(max_new_tokens):
+            idx_cond = idx[-self.block_size:]  # crop idx to the last block_size tokens
+            logits = self.model.predict(np.array([idx_cond]), verbose=0)
+            logits = logits[0, -1, :]  # focus only on the last time step
+            probs = softmax(logits, axis=-1)  # apply softmax to get probabilities
+            idx_next = np.random.choice(range(self.vocab_size), 1, p=probs)[0]
+            idx.append(idx_next)
+            res.append(idx_next)
+            print(decoder([idx_next]), end='')
+
+        print()
+        return res
+
+    def train_on_batch(self, x, y, *args, **kwargs):
+        return self.model.train_on_batch(x, y, *args, **kwargs)
 
 
-keras.utils.set_random_seed(1116)
-
-# hyperparameters
+# ---------- hyperparameters ----------
 batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-# max_iters = 5000
-# eval_interval = 500
-# eval_iters = 200
-max_iters = 500
-eval_interval = 50
-eval_iters = 20
+max_iters = 5000
+eval_interval = 500
+eval_iters = 200
 learning_rate = 3e-4
 n_embd = 384
 n_head = 6
 n_layer = 6
-dropout = 0.2
+dropout_rate = 0.2
 
+# ---------- train ----------
 data = Data(block_size, batch_size)
+transformer = TransformerModel(data.vocab_size, n_embd, n_head, n_layer, block_size, dropout_rate, learning_rate)
 
-# build model
-inputs = keras.Input((block_size,))
-outputs = TransformerLayer(data.vocab_size, n_embd, n_head, n_layer, dropout)(inputs)
-m = keras.Model(inputs, outputs)
-m.compile(optimizer=keras.optimizers.Adam(learning_rate),
-          loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
-
-# train
 for i in range(max_iters):
 
     # every once in a while evaluate the loss on train and val sets
     if i % eval_interval == 0 or i == max_iters - 1:
-        losses = estimate_loss(m, eval_iters, data)
-        print(f"step {i}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-        pass
+        print(f'Step {i}')
+        transformer.estimate_loss(eval_iters, data)
+
+        print('Text generated:')
+        transformer.generate_text(500, data.decoder)
 
     xb, yb = data.fetch_batch(Data.TRAIN_SPLIT)
-    loss = m.train_on_batch(xb, yb)
-    print(f'Batch {i}: loss {loss:.4f}')
+    loss = transformer.train_on_batch(xb, yb)
