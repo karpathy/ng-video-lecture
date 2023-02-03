@@ -2,6 +2,7 @@
 Time Series Transformer
 """
 from pprint import pprint
+import math
 import numpy as np
 import tensorflow as tf
 import os
@@ -12,25 +13,37 @@ from keras import backend as K
 
 
 class Head(layers.Layer):
-    def __init__(self, head_size, dropout):
+    def __init__(self, head_size, seq_len, dropout):
         super().__init__()
         self.head_size = head_size
+        self.seq_len = seq_len
         self.dropout_rate = dropout
 
     def build(self, input_shape):
-        self.key = layers.Dense(self.head_size, activation=False, use_bias=False)
-        self.query = layers.Dense(self.head_size, activation=False, use_bias=False)
-        self.value = layers.Dense(self.head_size, activation=False, use_bias=False)
+        self.key = layers.Dense(self.head_size, activation=None, use_bias=False)
+        self.query = layers.Dense(self.head_size, activation=None, use_bias=False)
+        self.value = layers.Dense(self.head_size, activation=None, use_bias=False)
         self.dropout = layers.Dropout(self.dropout_rate)
+        self.mask = tf.constant(np.tril(np.ones((self.seq_len, self.seq_len))))
 
     def call(self, x, *args, **kwargs):
-        _, T, C = x.shape
         k = self.key(x)     # (B,T,C)
         q = self.query(x)   # (B,T,C)
 
         # compute attention scores ("affinities")
+        k_transposed = K.permute_dimensions(k, (0, 2, 1))   # B, C, T
+        wei = tf.matmul(q, k_transposed)    # B, T, T
+        wei /= math.sqrt(C)     # scale
+        wei = layers.Softmax(axis=-1)(wei, self.mask)   # softmax while making the upper-triangle all 0
+        wei = self.dropout(wei)
 
+        # perform the weighted aggregation of the values
+        v = self.value(x)   # B, T, C
+        out = tf.matmul(wei, v)      # (B, T, T) @ (B, T, C) -> (B, T, C)
 
+        assert out.shape[-2] == self.seq_len and out.shape[-1] == self.head_size
+
+        return out
 
 
 def multi_head_self_attention_layer(num_heads, head_size, dropout=0.):
@@ -116,3 +129,8 @@ class TransformerLayer(layers.Layer):
 
         return logits
 
+B, T, C = 32, 8, 5
+head = Head(3, T, 0)
+head.build((T, C))
+x = tf.convert_to_tensor(np.random.random((B, T, C)))
+head.call(x)
