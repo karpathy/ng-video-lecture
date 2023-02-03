@@ -13,18 +13,17 @@ from keras import backend as K
 
 
 class Head(layers.Layer):
-    def __init__(self, head_size, seq_len, dropout):
+    def __init__(self, head_size, dropout_rate):
         super().__init__()
         self.head_size = head_size
-        self.seq_len = seq_len
-        self.dropout_rate = dropout
+        self.dropout_rate = dropout_rate
 
     def build(self, input_shape):
         self.key = layers.Dense(self.head_size, activation=None, use_bias=False)
         self.query = layers.Dense(self.head_size, activation=None, use_bias=False)
         self.value = layers.Dense(self.head_size, activation=None, use_bias=False)
         self.dropout = layers.Dropout(self.dropout_rate)
-        self.mask = tf.constant(np.tril(np.ones((self.seq_len, self.seq_len))))
+        self.mask = tf.constant(np.tril(np.ones((input_shape[1], input_shape[1]))))
 
     def call(self, x, *args, **kwargs):
         k = self.key(x)     # (B,T,C)
@@ -41,7 +40,28 @@ class Head(layers.Layer):
         v = self.value(x)   # B, T, C
         out = tf.matmul(wei, v)      # (B, T, T) @ (B, T, C) -> (B, T, C)
 
-        assert out.shape[-2] == self.seq_len and out.shape[-1] == self.head_size
+        assert out.shape[1] == x.shape[1] and out.shape[2] == self.head_size
+
+        return out
+
+class MultiHeadAttention(layers.Layer):
+    def __init__(self, num_heads, head_size, n_embd, dropout_rate):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_size = head_size
+        self.n_embd = n_embd
+        self.dropout_rate = dropout_rate
+
+    def build(self, input_shape):
+        self.heads = [Head(self.head_size, self.dropout_rate) for _ in range(self.num_heads)]
+        self.proj = layers.Dense(self.n_embd, activation=None)
+        self.dropout = layers.Dropout(self.dropout_rate)
+
+    def call(self, x, *args, **kwargs):
+        out = layers.Concatenate(axis=-1)([h(x) for h in self.heads])
+        out = self.dropout(self.proj(out))
+
+        assert out.shape[1] == x.shape[1] and out.shape[2] == self.n_embd
 
         return out
 
@@ -130,7 +150,8 @@ class TransformerLayer(layers.Layer):
         return logits
 
 B, T, C = 32, 8, 5
-head = Head(3, T, 0)
-head.build((T, C))
 x = tf.convert_to_tensor(np.random.random((B, T, C)))
-head.call(x)
+
+mha = MultiHeadAttention(num_heads=2, head_size=3, n_embd=5, dropout_rate=0)
+mha.build((B, T, C))
+mha.call(x).shape
