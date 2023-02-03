@@ -153,8 +153,8 @@ class TransformerModel:
         outputs = TransformerLayer(vocab_size, n_embd, n_head, n_layer, dropout_rate)(inputs)
         self.model = keras.Model(inputs, outputs)
 
-        # If AdamW does not work on Apple Silicon GPU, change to optimizer.Adam instead.
-        self.model.compile(optimizer=keras.optimizers.experimental.AdamW(learning_rate),
+        # keras.optimizers.experimental.AdamW behaves strangely. Using Adam instead for now.
+        self.model.compile(optimizer=keras.optimizers.Adam(learning_rate),
                            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
         self.model.summary()
 
