@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import os
+import subprocess
 
 # hyperparameters
 batch_size = 64 # how many independent sequences will we process in parallel?
@@ -18,7 +20,10 @@ dropout = 0.2
 
 torch.manual_seed(1337)
 
-# wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
+if not os.path.exists('input.txt'): 
+    output = subprocess.check_output(["wget", "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"])
+    print(output.decode())
+    
 with open('input.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
