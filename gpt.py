@@ -27,6 +27,8 @@ with open('input.txt', 'r', encoding='utf-8') as f:
 if tokenizer == 'tiktoken':
     vocab_size = 50257 #from https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py
     bpt_tiktokenizer = tiktoken.get_encoding('gpt2')
+    encode = lambda s: [int(bpt_tiktokenizer.encode(c)[0]) for c in s] # encoder: take a string, output a list of integers
+    decode = lambda l: ''.join([bpt_tiktokenizer.decode([i]) for i in l]) # decoder: take a list of integers, output a string
 
 elif tokenizer == 'char':
     # here are all the unique characters that occur in this text
