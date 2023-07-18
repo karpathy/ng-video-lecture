@@ -8,7 +8,9 @@ block_size = 8 # what is the maximum context length for predictions?
 max_iters = 3000
 eval_interval = 300
 learning_rate = 1e-2
-device = torch.cuda.is_available() and 'cuda' or torch.backends.mps.is_available() and 'mps' or 'cpu'
+device = ('cuda' if torch.cuda.is_available()
+          else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+          else 'cpu')
 eval_iters = 200
 # ------------
 
