@@ -1,1 +1,1 @@
-This directory contains the Keras counterparts of the original. Here the code was written to resemble Andrej's PyTorch code as much as possible.
+This directory demonstrates the implementation of Transformers in Keras.
